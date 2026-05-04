@@ -587,6 +587,7 @@ pub fn run() {
             audio::recording_commands::poll_audio_device_events,
             audio::recording_commands::get_reconnection_status,
             audio::recording_commands::attempt_device_reconnect,
+            audio::recording_commands::add_user_note,
             // Playback device detection (Bluetooth warning)
             audio::recording_commands::get_active_audio_output,
             // Audio recovery commands (for transcript recovery feature)

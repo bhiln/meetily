@@ -1012,6 +1012,53 @@ pub async fn get_recording_state() -> serde_json::Value {
     }
 }
 
+/// Add a manual user note to the transcription during active recording
+#[tauri::command]
+pub async fn add_user_note<R: Runtime>(app: AppHandle<R>, note: String) -> Result<(), String> {
+    info!("Adding user note: {}", note);
+
+    // Check if currently recording
+    if !IS_RECORDING.load(Ordering::SeqCst) {
+        return Err("No recording is currently active".to_string());
+    }
+
+    // Get current recording duration for timestamping
+    let (audio_start_time, sequence_id) = {
+        let manager_guard = RECORDING_MANAGER.lock().unwrap();
+        if let Some(manager) = manager_guard.as_ref() {
+            let duration = manager.get_active_recording_duration().unwrap_or(0.0);
+            let seq_id = transcription::SEQUENCE_COUNTER.fetch_add(1, Ordering::SeqCst);
+            (duration, seq_id)
+        } else {
+            return Err("No recording manager found".to_string());
+        }
+    };
+
+    // Format the note text
+    let formatted_text = format!("[user-note] {}", note);
+
+    // Create transcript update
+    let update = TranscriptUpdate {
+        text: formatted_text,
+        timestamp: transcription::format_current_timestamp(),
+        source: "User".to_string(),
+        sequence_id,
+        chunk_start_time: audio_start_time,
+        is_partial: false,
+        confidence: 1.0,
+        audio_start_time,
+        audio_end_time: audio_start_time, // Notes are point-in-time
+        duration: 0.0,
+    };
+
+    // Emit transcript update
+    app.emit("transcript-update", &update)
+        .map_err(|e| format!("Failed to emit user note: {}", e))?;
+
+    info!("✅ User note added successfully at {:.2}s", audio_start_time);
+    Ok(())
+}
+
 /// Get the meeting folder path for the current recording
 /// Returns the path if a meeting name was set and folder structure initialized
 #[tauri::command]
