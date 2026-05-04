@@ -3,6 +3,7 @@ import { PermissionWarning } from '@/components/PermissionWarning';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Input } from '@/components/ui/input';
+import { SpeakerMentionInput } from '@/components/SpeakerMentionInput';
 import { Copy, GlobeIcon, Send } from 'lucide-react';
 import { useTranscripts } from '@/contexts/TranscriptContext';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -113,11 +114,11 @@ export function TranscriptPanel({
                 onSubmit={handleAddNote}
                 className="flex flex-1 max-w-md ml-4 items-center space-x-2"
               >
-                <Input
-                  type="text"
+                <SpeakerMentionInput
                   placeholder="Add a note to transcript..."
                   value={userNote}
-                  onChange={(e) => setUserNote(e.target.value)}
+                  onChange={(val) => setUserNote(val)}
+                  onSubmit={handleAddNote}
                   disabled={isSendingNote}
                   className="h-9"
                 />

@@ -623,6 +623,13 @@ pub fn run() {
             api::api_get_meeting_transcripts,
             api::api_save_meeting_title,
             api::api_save_transcript,
+            // Speaker management
+            api::api_create_speaker,
+            api::api_get_all_speakers,
+            api::api_get_speaker_by_id,
+            api::api_update_speaker,
+            api::api_delete_speaker,
+            api::api_search_speakers,
             api::open_meeting_folder,
             api::test_backend_connection,
             api::debug_backend_connection,

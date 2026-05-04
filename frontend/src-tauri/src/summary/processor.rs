@@ -1,5 +1,7 @@
 use crate::summary::llm_client::{generate_summary, LLMProvider};
 use crate::summary::templates;
+use crate::database::repositories::speaker::SpeakersRepository;
+use sqlx::SqlitePool;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::Client;
@@ -249,6 +251,7 @@ pub async fn generate_meeting_summary(
     cancellation_token: Option<&CancellationToken>,
     summary_language: Option<&str>,
     cached_english: Option<&str>,
+    pool: Option<&SqlitePool>,
 ) -> Result<(String, String, i64), String> {
     if let Some(token) = cancellation_token {
         if token.is_cancelled() {
@@ -417,6 +420,35 @@ pub async fn generate_meeting_summary(
         let mut final_user_prompt = format!(
             "<transcript_chunks>\n{content_to_summarize}\n</transcript_chunks>\n"
         );
+
+        // Inject Speaker Context if pool is available
+        if let Some(p) = pool {
+            if let Ok(speakers) = SpeakersRepository::get_all_speakers(p).await {
+                let mut mentioned_speakers = Vec::new();
+                let text_lower = text.to_lowercase();
+                for speaker in speakers {
+                    let name_mention = format!("@{}", speaker.name).to_lowercase();
+                    let name_lower = speaker.name.to_lowercase();
+                    if text_lower.contains(&name_lower) || text_lower.contains(&name_mention) {
+                        mentioned_speakers.push(speaker);
+                    }
+                }
+
+                if !mentioned_speakers.is_empty() {
+                    let mut context_block = String::from("\n\nInformation about people mentioned in this meeting:\n");
+                    let mut has_context = false;
+                    for speaker in mentioned_speakers {
+                        if let Some(context) = &speaker.user_context {
+                            context_block.push_str(&format!("- {}: {}\n", speaker.name, context));
+                            has_context = true;
+                        }
+                    }
+                    if has_context {
+                        final_user_prompt.push_str(&context_block);
+                    }
+                }
+            }
+        }
 
         if !custom_prompt.is_empty() {
             final_user_prompt.push_str("\n\nUser Provided Context:\n\n<user_context>\n");

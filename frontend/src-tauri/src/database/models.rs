@@ -128,3 +128,13 @@ pub struct TranscriptSetting {
     #[serde(rename = "openaiApiKey")]
     pub openai_api_key: Option<String>,
 }
+
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct SpeakerModel {
+    pub id: String,
+    pub name: String,
+    pub user_context: Option<String>,
+    pub voice_profile: Option<Vec<u8>>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}

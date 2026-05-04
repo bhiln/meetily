@@ -3,6 +3,7 @@
 import { Summary, SummaryResponse, Transcript } from '@/types';
 import { EditableTitle } from '@/components/EditableTitle';
 import { BlockNoteSummaryView, BlockNoteSummaryViewRef } from '@/components/AISummary/BlockNoteSummaryView';
+import { MeetingSpeakers } from './MeetingSpeakers';
 import { EmptyStateSummary } from '@/components/EmptyStateSummary';
 import { ModelConfig } from '@/components/ModelSettingsModal';
 import { SummaryGeneratorButtonGroup } from './SummaryGeneratorButtonGroup';
@@ -338,6 +339,7 @@ export function SummaryPanel({
             </div>
           )}
           <div className="p-6 w-full">
+            <MeetingSpeakers transcripts={transcripts} />
             <BlockNoteSummaryView
               ref={summaryRef}
               summaryData={aiSummary}

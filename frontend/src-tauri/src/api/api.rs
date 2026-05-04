@@ -9,7 +9,7 @@ use crate::{
         models::MeetingModel,
         repositories::{
             meeting::MeetingsRepository, setting::SettingsRepository,
-            transcript::TranscriptsRepository,
+            speaker::SpeakersRepository, transcript::TranscriptsRepository,
         },
     },
     state::AppState,
@@ -1380,4 +1380,67 @@ pub async fn api_test_custom_openai_connection<R: Runtime>(
             }
         }
     }
+}
+
+// ============================================================================
+// SPEAKER MANAGEMENT COMMANDS
+// ============================================================================
+
+#[tauri::command]
+pub async fn api_create_speaker(
+    state: tauri::State<'_, AppState>,
+    name: String,
+    user_context: Option<String>,
+) -> Result<String, String> {
+    SpeakersRepository::create_speaker(&state.db_manager.pool(), &name, user_context)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn api_get_all_speakers(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<crate::database::models::SpeakerModel>, String> {
+    SpeakersRepository::get_all_speakers(&state.db_manager.pool())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn api_get_speaker_by_id(
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Option<crate::database::models::SpeakerModel>, String> {
+    SpeakersRepository::get_speaker_by_id(&state.db_manager.pool(), &id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn api_update_speaker(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    name: String,
+    user_context: Option<String>,
+) -> Result<(), String> {
+    SpeakersRepository::update_speaker(&state.db_manager.pool(), &id, &name, user_context)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn api_delete_speaker(state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
+    SpeakersRepository::delete_speaker(&state.db_manager.pool(), &id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn api_search_speakers(
+    state: tauri::State<'_, AppState>,
+    query: String,
+) -> Result<Vec<crate::database::models::SpeakerModel>, String> {
+    SpeakersRepository::search_speakers(&state.db_manager.pool(), &query)
+        .await
+        .map_err(|e| e.to_string())
 }

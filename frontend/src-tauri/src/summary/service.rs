@@ -303,6 +303,7 @@ impl SummaryService {
             Some(&cancellation_token),
             summary_language.as_deref(),
             cached_english.as_deref(),
+            Some(&pool),
         )
         .await;
 
