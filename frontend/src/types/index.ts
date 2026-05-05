@@ -7,6 +7,7 @@ export interface Message {
 export interface Transcript {
   id: string;
   text: string;
+  speaker?: string;
   timestamp: string; // Wall-clock time (e.g., "14:30:05")
   sequence_id?: number;
   chunk_start_time?: number; // Legacy field
@@ -20,6 +21,7 @@ export interface Transcript {
 
 export interface TranscriptUpdate {
   text: string;
+  speaker?: string;
   timestamp: string; // Wall-clock time for reference
   source: string;
   sequence_id: number;
@@ -106,5 +108,6 @@ export interface TranscriptSegmentData {
   timestamp: number; // audio_start_time in seconds
   endTime?: number; // audio_end_time in seconds
   text: string;
+  speaker?: string;
   confidence?: number;
 }

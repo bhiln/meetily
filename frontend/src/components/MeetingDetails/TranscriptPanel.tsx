@@ -4,7 +4,10 @@ import { Transcript, TranscriptSegmentData } from '@/types';
 import { TranscriptView } from '@/components/TranscriptView';
 import { VirtualizedTranscriptView } from '@/components/VirtualizedTranscriptView';
 import { TranscriptButtonGroup } from './TranscriptButtonGroup';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { transcriptService } from '@/services/transcriptService';
+
+import { Speaker, speakerService } from '@/services/speakerService';
 
 interface TranscriptPanelProps {
   transcripts: Transcript[];
@@ -49,6 +52,44 @@ export function TranscriptPanel({
   meetingFolderPath,
   onRefetchTranscripts,
 }: TranscriptPanelProps) {
+  
+  // Speakers state
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
+
+  useEffect(() => {
+    const loadSpeakers = async () => {
+      try {
+        const loadedSpeakers = await speakerService.getAllSpeakers();
+        setSpeakers(loadedSpeakers);
+      } catch (error) {
+        console.error('Failed to load speakers:', error);
+      }
+    };
+    loadSpeakers();
+  }, []);
+
+  const handleAssignSpeaker = async (segmentId: string, speakerName: string | null) => {
+    try {
+      // Find the segment to check its current speaker
+      const segment = convertedSegments.find(s => s.id === segmentId);
+      const oldSpeaker = segment?.speaker;
+      
+      // If it's a generic speaker, rename all occurrences in the meeting
+      if (oldSpeaker?.startsWith("Speaker ") && speakerName && meetingId) {
+        await transcriptService.renameSpeaker(meetingId, oldSpeaker, speakerName);
+      } else {
+        // Otherwise just update the single line
+        await transcriptService.updateTranscriptSpeaker(segmentId, speakerName);
+      }
+
+      if (onRefetchTranscripts) {
+        await onRefetchTranscripts();
+      }
+    } catch (err) {
+      console.error("Failed to update speaker", err);
+    }
+  };
+
   // Convert transcripts to segments if pagination is not used but we want virtualization
   const convertedSegments = useMemo(() => {
     if (usePagination && segments) {
@@ -60,6 +101,7 @@ export function TranscriptPanel({
       timestamp: t.audio_start_time ?? 0,
       endTime: t.audio_end_time,
       text: t.text,
+      speaker: t.speaker,
       confidence: t.confidence,
     }));
   }, [transcripts, usePagination, segments]);
@@ -94,6 +136,8 @@ export function TranscriptPanel({
           totalCount={totalCount}
           loadedCount={loadedCount}
           onLoadMore={onLoadMore}
+          speakers={speakers}
+          onAssignSpeaker={handleAssignSpeaker}
         />
       </div>
 

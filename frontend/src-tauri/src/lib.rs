@@ -468,6 +468,14 @@ pub fn run() {
                 }
             });
 
+            // Initialize Diarization Service
+            let app_handle_for_diarization = _app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = audio::diarization::api_init_diarization(app_handle_for_diarization).await {
+                    log::warn!("Failed to initialize Diarization service at startup: {}", e);
+                }
+            });
+
             // Trigger system audio permission request on startup (similar to microphone permission)
             // #[cfg(target_os = "macos")]
             // {
@@ -621,6 +629,8 @@ pub fn run() {
             api::api_get_meeting,
             api::api_get_meeting_metadata,
             api::api_get_meeting_transcripts,
+            api::api_update_transcript_speaker,
+            api::api_rename_speaker,
             api::api_save_meeting_title,
             api::api_save_transcript,
             // Speaker management
@@ -630,6 +640,10 @@ pub fn run() {
             api::api_update_speaker,
             api::api_delete_speaker,
             api::api_search_speakers,
+            // Diarization
+            audio::diarization::api_init_diarization,
+            audio::diarization::api_download_diarization_model,
+            audio::diarization::api_associate_voice_with_speaker,
             api::open_meeting_folder,
             api::test_backend_connection,
             api::debug_backend_connection,

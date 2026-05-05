@@ -6,6 +6,10 @@ import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useTranscriptStreaming } from "@/hooks/useTranscriptStreaming";
 import { ConfidenceIndicator } from "./ConfidenceIndicator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "./ui/command";
+import { UserPlus, User } from 'lucide-react';
+import { Speaker } from '@/services/speakerService';
 import { RecordingStatusBar } from "./RecordingStatusBar";
 import { motion, AnimatePresence } from "framer-motion";
 import { TranscriptSegmentData } from "@/types";
@@ -34,6 +38,10 @@ export interface VirtualizedTranscriptViewProps {
     totalCount?: number;
     loadedCount?: number;
     onLoadMore?: () => void;
+    
+    // Speaker identification
+    speakers?: Speaker[];
+    onAssignSpeaker?: (segmentId: string, speakerName: string | null) => void;
 }
 
 // Threshold for enabling virtualization (below this, use simple rendering)
@@ -63,47 +71,135 @@ function cleanStopWords(text: string): string {
     return cleanedText.replace(/\s+/g, ' ').trim();
 }
 
+// Helper function to extract initials from a name
+function getInitials(name: string): string {
+    if (!name) return '??';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 // Memoized transcript segment component
 const TranscriptSegment = memo(function TranscriptSegment({
     id,
     timestamp,
     text,
+    speaker,
     confidence,
     isStreaming,
     showConfidence,
+    speakers = [],
+    onAssignSpeaker,
+    isNewSpeaker,
 }: {
     id: string;
     timestamp: number;
     text: string;
+    speaker?: string;
     confidence?: number;
     isStreaming: boolean;
     showConfidence: boolean;
+    speakers?: Speaker[];
+    onAssignSpeaker?: (segmentId: string, speakerName: string | null) => void;
+    isNewSpeaker: boolean;
 }) {
+    const [open, setOpen] = useState(false);
     const displayText = cleanStopWords(text) || (text.trim() === '' ? '[Silence]' : text);
 
     return (
-        <div id={`segment-${id}`} className="mb-3">
-            <div className="flex items-start gap-2">
-                <Tooltip>
-                    <TooltipTrigger>
-                        <span className="text-xs text-gray-400 mt-1 flex-shrink-0 min-w-[50px]">
-                            {formatRecordingTime(timestamp)}
-                        </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        {confidence !== undefined && showConfidence && (
-                            <ConfidenceIndicator confidence={confidence} showIndicator={showConfidence} />
-                        )}
-                    </TooltipContent>
-                </Tooltip>
-                <div className="flex-1">
-                    {isStreaming ? (
-                        <div className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
-                            <p className="text-base text-gray-800 leading-relaxed">{displayText}</p>
+        <div id={`segment-${id}`} className={`group ${isNewSpeaker ? 'mt-6 mb-2' : 'mb-1'}`}>
+            {isNewSpeaker && (
+                <div className="flex items-center gap-3 mb-2 ml-1">
+                    <Popover open={open} onOpenChange={setOpen}>
+                        <PopoverTrigger asChild>
+                            <button className="h-8 w-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-xs font-bold text-blue-700 hover:bg-blue-200 transition-colors shadow-sm shrink-0">
+                                {speaker ? getInitials(speaker) : <User className="h-4 w-4" />}
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="start">
+                            <Command>
+                                <CommandInput placeholder="Search speaker..." />
+                                <CommandList>
+                                    <CommandEmpty>No speaker found.</CommandEmpty>
+                                    <CommandGroup>
+                                        <CommandItem
+                                            onSelect={() => {
+                                                onAssignSpeaker?.(id, null);
+                                                setOpen(false);
+                                            }}
+                                        >
+                                            Clear Speaker
+                                        </CommandItem>
+                                        {speakers.map((s) => (
+                                            <CommandItem
+                                                key={s.id}
+                                                onSelect={() => {
+                                                    onAssignSpeaker?.(id, s.name);
+                                                    setOpen(false);
+                                                }}
+                                            >
+                                                {s.name}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+                    
+                    <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-gray-900 truncate">
+                                {speaker || "Unknown Speaker"}
+                            </span>
+                            <span className="text-[10px] font-medium text-gray-400 tabular-nums">
+                                {formatRecordingTime(timestamp)}
+                            </span>
                         </div>
-                    ) : (
-                        <p className="text-base text-gray-800 leading-relaxed">{displayText}</p>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-8 flex justify-center pt-1">
+                    {!isNewSpeaker && (
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="text-[10px] text-gray-400 font-medium tabular-nums cursor-default">
+                                        {formatRecordingTime(timestamp)}
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="right">
+                                    {confidence !== undefined && showConfidence && (
+                                        <ConfidenceIndicator confidence={confidence} showIndicator={showConfidence} />
+                                    )}
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
                     )}
+                </div>
+                
+                <div className={`flex-1 ${isNewSpeaker ? '' : '-mt-1'}`}>
+                    <div className="relative group/text">
+                        {isStreaming ? (
+                            <div className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
+                                <p className="text-base text-gray-800 leading-relaxed">{displayText}</p>
+                            </div>
+                        ) : (
+                            <p className="text-base text-gray-800 leading-relaxed group-hover:text-black transition-colors">{displayText}</p>
+                        )}
+                        
+                        {!speaker && !isNewSpeaker && (
+                             <button 
+                                onClick={() => setOpen(true)}
+                                className="absolute -left-10 top-0.5 p-1 rounded-full text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all"
+                                title="Identify Speaker"
+                             >
+                                <UserPlus className="h-3.5 w-3.5" />
+                             </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -124,6 +220,8 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
     totalCount = 0,
     loadedCount = 0,
     onLoadMore,
+    speakers = [],
+    onAssignSpeaker,
 }) => {
     // Create scroll ref first - shared between virtualizer and auto-scroll hook
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -275,6 +373,10 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                         {virtualizer.getVirtualItems().map((virtualRow) => {
                             const segment = segments[virtualRow.index];
                             const isStreaming = streamingSegmentId === segment.id;
+                            
+                            // Check if speaker changed from previous segment
+                            const prevSegment = virtualRow.index > 0 ? segments[virtualRow.index - 1] : null;
+                            const isNewSpeaker = virtualRow.index === 0 || segment.speaker !== prevSegment?.speaker;
 
                             return (
                                 <div
@@ -293,9 +395,13 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         id={segment.id}
                                         timestamp={segment.timestamp}
                                         text={getDisplayText(segment)}
+                                        speaker={segment.speaker}
                                         confidence={segment.confidence}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
+                                        speakers={speakers}
+                                        onAssignSpeaker={onAssignSpeaker}
+                                        isNewSpeaker={isNewSpeaker}
                                     />
                                 </div>
                             );
@@ -335,8 +441,12 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                 // Simple rendering for small lists (better animations)
                 <>
                     <div className="space-y-1">
-                        {segments.map((segment) => {
+                        {segments.map((segment, index) => {
                             const isStreaming = streamingSegmentId === segment.id;
+                            
+                            // Check if speaker changed from previous segment
+                            const prevSegment = index > 0 ? segments[index - 1] : null;
+                            const isNewSpeaker = index === 0 || segment.speaker !== prevSegment?.speaker;
 
                             return (
                                 <motion.div
@@ -349,9 +459,13 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         id={segment.id}
                                         timestamp={segment.timestamp}
                                         text={getDisplayText(segment)}
+                                        speaker={segment.speaker}
                                         confidence={segment.confidence}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
+                                        speakers={speakers}
+                                        onAssignSpeaker={onAssignSpeaker}
+                                        isNewSpeaker={isNewSpeaker}
                                     />
                                 </motion.div>
                             );

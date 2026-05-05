@@ -612,6 +612,7 @@ impl AudioCapture {
             sample_rate: if self.needs_resampling { 48000 } else { self.sample_rate },
             timestamp,
             chunk_id,
+            speaker: None,
             device_type: self.device_type.clone(),
         };
 
@@ -832,7 +833,7 @@ impl AudioPipeline {
                             let mixed_with_gain = mixed_clean;
 
                             // STEP 3: Send mixed audio for transcription (VAD + Whisper)
-                            match self.vad_processor.process_audio(&mixed_with_gain) {
+                            match self.vad_processor.process_audio(&mixed_with_gain, None) {
                                 Ok(speech_segments) => {
                                     for segment in speech_segments {
                                         let duration_ms = segment.end_timestamp_ms - segment.start_timestamp_ms;
@@ -846,6 +847,7 @@ impl AudioPipeline {
                                                 sample_rate: 16000,
                                                 timestamp: segment.start_timestamp_ms / 1000.0,
                                                 chunk_id: self.chunk_id_counter,
+                                                speaker: None,
                                                 device_type: DeviceType::Microphone,  // Mixed audio
                                             };
 
@@ -872,6 +874,7 @@ impl AudioPipeline {
                                     sample_rate: self.sample_rate,
                                     timestamp: chunk.timestamp,
                                     chunk_id: self.chunk_id_counter,
+                                    speaker: None,
                                     device_type: DeviceType::Microphone,  // Mixed audio
                                 };
                                 let _ = sender.send(recording_chunk);
@@ -916,6 +919,7 @@ impl AudioPipeline {
                             sample_rate: 16000,
                             timestamp: segment.start_timestamp_ms / 1000.0,
                             chunk_id: self.chunk_id_counter,
+                            speaker: None,
                             device_type: DeviceType::Microphone,
                         };
 
@@ -1038,6 +1042,7 @@ impl AudioPipelineManager {
                 sample_rate: 16000,
                 timestamp: 0.0,
                 chunk_id: u64::MAX, // Special ID to indicate flush
+                speaker: None,
                 device_type: super::recording_state::DeviceType::Microphone,
             };
 
@@ -1058,6 +1063,7 @@ impl AudioPipelineManager {
                         sample_rate: 16000,
                         timestamp: 0.0,
                         chunk_id: u64::MAX - (i as u64),
+                        speaker: None,
                         device_type: super::recording_state::DeviceType::Microphone,
                     };
                     let _ = sender.send(additional_flush);

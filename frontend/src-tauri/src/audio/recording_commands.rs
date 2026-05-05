@@ -244,6 +244,12 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
 
     // Set recording flag and reset speech detection flag
     info!("🔍 Setting IS_RECORDING to true and resetting SPEECH_DETECTED_EMITTED");
+    
+    // NEW: Reset speaker diarization session clusters for new recording
+    if let Some(service) = super::diarization::get_diarization_service() {
+        service.reset_session();
+    }
+    
     IS_RECORDING.store(true, Ordering::SeqCst);
     reset_speech_detected_flag(); // Reset for new recording session
 
@@ -266,6 +272,7 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
                 let segment = crate::audio::recording_saver::TranscriptSegment {
                     id: format!("seg_{}", update.sequence_id),
                     text: update.text.clone(),
+                    speaker: update.speaker.clone(),
                     audio_start_time: update.audio_start_time,
                     audio_end_time: update.audio_end_time,
                     duration: update.duration,
@@ -412,6 +419,12 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
 
     // Set recording flag and reset speech detection flag
     info!("🔍 Setting IS_RECORDING to true and resetting SPEECH_DETECTED_EMITTED");
+    
+    // NEW: Reset speaker diarization session clusters for new recording
+    if let Some(service) = super::diarization::get_diarization_service() {
+        service.reset_session();
+    }
+    
     IS_RECORDING.store(true, Ordering::SeqCst);
     reset_speech_detected_flag(); // Reset for new recording session
 
@@ -434,6 +447,7 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
                 let segment = crate::audio::recording_saver::TranscriptSegment {
                     id: format!("seg_{}", update.sequence_id),
                     text: update.text.clone(),
+                    speaker: update.speaker.clone(),
                     audio_start_time: update.audio_start_time,
                     audio_end_time: update.audio_end_time,
                     duration: update.duration,
@@ -1042,6 +1056,7 @@ pub async fn add_user_note<R: Runtime>(app: AppHandle<R>, note: String) -> Resul
         text: formatted_text,
         timestamp: transcription::format_current_timestamp(),
         source: "User".to_string(),
+        speaker: Some("Me".to_string()), // User notes are always "Me"
         sequence_id,
         chunk_start_time: audio_start_time,
         is_partial: false,

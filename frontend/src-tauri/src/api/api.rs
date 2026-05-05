@@ -129,6 +129,7 @@ pub struct MeetingDetails {
 pub struct MeetingTranscript {
     pub id: String,
     pub text: String,
+    pub speaker: Option<String>,
     pub timestamp: String,
     // Recording-relative timestamps for audio-transcript synchronization
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -180,6 +181,7 @@ pub struct SaveTranscriptRequest {
 pub struct TranscriptSegment {
     pub id: String,
     pub text: String,
+    pub speaker: Option<String>,
     pub timestamp: String,
     // NEW: Recording-relative timestamps for playback synchronization
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -874,6 +876,7 @@ pub async fn api_get_meeting_transcripts<R: Runtime>(
                 .map(|t| MeetingTranscript {
                     id: t.id,
                     text: t.transcript,
+                    speaker: t.speaker,
                     timestamp: t.timestamp,
                     audio_start_time: t.audio_start_time,
                     audio_end_time: t.audio_end_time,
@@ -892,6 +895,71 @@ pub async fn api_get_meeting_transcripts<R: Runtime>(
         Err(e) => {
             log_error!("Error retrieving transcripts for meeting {}: {}", meeting_id, e);
             Err(format!("Failed to retrieve transcripts: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn api_update_transcript_speaker<R: Runtime>(
+    _app: AppHandle<R>,
+    transcript_id: String,
+    speaker: Option<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    log_info!(
+        "api_update_transcript_speaker called for transcript_id: {}, speaker: {:?}",
+        transcript_id,
+        speaker
+    );
+
+    let pool = state.db_manager.pool();
+
+    match TranscriptsRepository::update_transcript_speaker(pool, &transcript_id, speaker.clone()).await {
+        Ok(success) => {
+            if success {
+                Ok(serde_json::json!({
+                    "status": "success",
+                    "message": "Transcript speaker updated successfully"
+                }))
+            } else {
+                Err("Transcript not found".to_string())
+            }
+        }
+        Err(e) => {
+            log_error!("Error updating transcript speaker for {}: {}", transcript_id, e);
+            Err(format!("Failed to update transcript speaker: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn api_rename_speaker<R: Runtime>(
+    _app: AppHandle<R>,
+    meeting_id: String,
+    old_name: String,
+    new_name: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    log_info!(
+        "api_rename_speaker called for meeting: {}, {} -> {}",
+        meeting_id,
+        old_name,
+        new_name
+    );
+
+    let pool = state.db_manager.pool();
+
+    match TranscriptsRepository::rename_speaker_in_meeting(pool, &meeting_id, &old_name, &new_name).await {
+        Ok(count) => {
+            Ok(serde_json::json!({
+                "status": "success",
+                "message": format!("Renamed {} occurrences", count),
+                "count": count
+            }))
+        }
+        Err(e) => {
+            log_error!("Error renaming speaker in meeting {}: {}", meeting_id, e);
+            Err(format!("Failed to rename speaker: {}", e))
         }
     }
 }

@@ -32,5 +32,13 @@ export const speakerService = {
 
   async searchSpeakers(query: string): Promise<Speaker[]> {
     return invoke<Speaker[]>('api_search_speakers', { query });
+  },
+
+  async downloadDiarizationModel(): Promise<void> {
+    return invoke<void>('api_download_diarization_model');
+  },
+
+  async associateVoice(speakerId: string, audioSamples: number[]): Promise<void> {
+    return invoke<void>('api_associate_voice_with_speaker', { speakerId, audioSamples });
   }
 };

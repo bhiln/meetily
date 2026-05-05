@@ -27,6 +27,7 @@ pub struct Transcript {
     pub id: String,
     pub meeting_id: String,
     pub transcript: String,
+    pub speaker: Option<String>,
     pub timestamp: String,
     pub summary: Option<String>,
     pub action_items: Option<String>,

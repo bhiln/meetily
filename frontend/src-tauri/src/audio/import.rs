@@ -545,7 +545,7 @@ async fn run_import<R: Runtime>(
     info!("Processing {} segments (after splitting)", processable_count);
 
     // Process each speech segment
-    let mut all_transcripts: Vec<(String, f64, f64)> = Vec::new();
+    let mut all_transcripts: Vec<(String, f64, f64, Option<String>)> = Vec::new();
     let mut total_confidence = 0.0f32;
 
     for (i, segment) in processable_segments.iter().enumerate() {
@@ -602,7 +602,16 @@ async fn run_import<R: Runtime>(
                 i + 1, processable_count, segment_duration_sec, conf,
                 if trimmed.len() > 80 { let mut end = 80; while !trimmed.is_char_boundary(end) { end -= 1; } &trimmed[..end] } else { trimmed }
             );
-            all_transcripts.push((text, segment.start_timestamp_ms, segment.end_timestamp_ms));
+            
+            // NEW: Try to identify speaker
+            let mut speaker = None;
+            if let Some(service) = crate::audio::diarization::get_diarization_service() {
+                if let Ok(embedding) = service.compute_embedding(&segment.samples) {
+                    speaker = service.identify_speaker(&embedding);
+                }
+            }
+            
+            all_transcripts.push((text, segment.start_timestamp_ms, segment.end_timestamp_ms, speaker));
             total_confidence += conf;
         } else {
             debug!("Segment {}/{}: {:.1}s — empty transcription", i + 1, processable_count, segment_duration_sec);
@@ -974,6 +983,11 @@ pub async fn start_import_audio_command<R: Runtime>(
         return Err("Import already in progress".to_string());
     }
 
+    // NEW: Reset diarization session for fresh import
+    if let Some(service) = super::diarization::get_diarization_service() {
+        service.reset_session();
+    }
+
     // Spawn import in background
     tauri::async_runtime::spawn(async move {
         let result = start_import(app, source_path, title, language, model, provider).await;
@@ -1018,14 +1032,14 @@ mod tests {
 
     #[test]
     fn test_create_transcript_segments_empty() {
-        let transcripts: Vec<(String, f64, f64)> = vec![];
+        let transcripts: Vec<(String, f64, f64, Option<String>)> = vec![];
         let segments = create_transcript_segments(&transcripts);
         assert!(segments.is_empty());
     }
 
     #[test]
     fn test_create_transcript_segments_single() {
-        let transcripts = vec![("Hello world".to_string(), 0.0, 1500.0)];
+        let transcripts = vec![("Hello world".to_string(), 0.0, 1500.0, None)];
         let segments = create_transcript_segments(&transcripts);
 
         assert_eq!(segments.len(), 1);

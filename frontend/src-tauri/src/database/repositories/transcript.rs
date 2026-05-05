@@ -47,12 +47,13 @@ impl TranscriptsRepository {
         for segment in transcripts {
             let transcript_id = format!("transcript-{}", Uuid::new_v4());
             let result = sqlx::query(
-                "INSERT INTO transcripts (id, meeting_id, transcript, timestamp, audio_start_time, audio_end_time, duration)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO transcripts (id, meeting_id, transcript, speaker, timestamp, audio_start_time, audio_end_time, duration)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
             )
             .bind(&transcript_id)
             .bind(&meeting_id)
             .bind(&segment.text)
+            .bind(&segment.speaker)
             .bind(&segment.timestamp)
             .bind(segment.audio_start_time)
             .bind(segment.audio_end_time)
@@ -142,5 +143,45 @@ impl TranscriptsRepository {
             }
             None => transcript.chars().take(200).collect(), // Fallback to the start of the transcript
         }
+    }
+
+    pub async fn update_transcript_speaker(
+        pool: &SqlitePool,
+        transcript_id: &str,
+        speaker: Option<String>,
+    ) -> Result<bool, SqlxError> {
+        if transcript_id.trim().is_empty() {
+            return Err(SqlxError::Protocol(
+                "transcript_id cannot be empty".to_string(),
+            ));
+        }
+
+        let rows_affected = sqlx::query(
+            "UPDATE transcripts SET speaker = ? WHERE id = ?"
+        )
+        .bind(speaker)
+        .bind(transcript_id)
+        .execute(pool)
+        .await?;
+
+        Ok(rows_affected.rows_affected() > 0)
+    }
+
+    pub async fn rename_speaker_in_meeting(
+        pool: &SqlitePool,
+        meeting_id: &str,
+        old_name: &str,
+        new_name: &str,
+    ) -> Result<u64, SqlxError> {
+        let rows_affected = sqlx::query(
+            "UPDATE transcripts SET speaker = ? WHERE meeting_id = ? AND speaker = ?"
+        )
+        .bind(new_name)
+        .bind(meeting_id)
+        .bind(old_name)
+        .execute(pool)
+        .await?;
+
+        Ok(rows_affected.rows_affected())
     }
 }

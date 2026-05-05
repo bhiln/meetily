@@ -46,6 +46,32 @@ export class TranscriptService {
     return invoke<TranscriptionStatus>('get_transcription_status');
   }
 
+  /**
+   * Update the speaker assigned to a transcript segment
+   * @param transcriptId - ID of the transcript segment
+   * @param speaker - Name of the speaker, or null/undefined to clear
+   */
+  async updateTranscriptSpeaker(transcriptId: string, speaker: string | null): Promise<void> {
+    return invoke('api_update_transcript_speaker', {
+      transcriptId,
+      speaker
+    });
+  }
+
+  /**
+   * Rename all occurrences of a speaker in a meeting
+   * @param meetingId - Meeting ID
+   * @param oldName - Current speaker name
+   * @param newName - New speaker name
+   */
+  async renameSpeaker(meetingId: string, oldName: string, newName: string): Promise<void> {
+    return invoke('api_rename_speaker', {
+      meetingId,
+      oldName,
+      newName
+    });
+  }
+
   // Event Listeners
 
   /**

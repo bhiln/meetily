@@ -11,8 +11,9 @@ import { useRecordingState } from '@/contexts/RecordingStateContext';
 import { usePermissionCheck } from '@/hooks/usePermissionCheck';
 import { ModalType } from '@/hooks/useModalState';
 import { useIsLinux } from '@/hooks/usePlatform';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { Speaker, speakerService } from '@/services/speakerService';
 
 /**
  * TranscriptPanel Component
@@ -34,7 +35,7 @@ export function TranscriptPanel({
   showModal
 }: TranscriptPanelProps) {
   // Contexts
-  const { transcripts, transcriptContainerRef, copyTranscript } = useTranscripts();
+  const { transcripts, transcriptContainerRef, copyTranscript, updateTranscriptSpeaker } = useTranscripts();
   const { transcriptModelConfig } = useConfig();
   const { isRecording, isPaused } = useRecordingState();
   const { checkPermissions, isChecking, hasSystemAudio, hasMicrophone } = usePermissionCheck();
@@ -43,6 +44,27 @@ export function TranscriptPanel({
   // Local state for user notes
   const [userNote, setUserNote] = useState('');
   const [isSendingNote, setIsSendingNote] = useState(false);
+  
+  // Speakers state
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
+
+  useEffect(() => {
+    const loadSpeakers = async () => {
+      try {
+        const loadedSpeakers = await speakerService.getAllSpeakers();
+        setSpeakers(loadedSpeakers);
+      } catch (error) {
+        console.error('Failed to load speakers:', error);
+      }
+    };
+    loadSpeakers();
+  }, []);
+
+  const handleAssignSpeaker = async (segmentId: string, speakerName: string | null) => {
+    if (updateTranscriptSpeaker) {
+      await updateTranscriptSpeaker(segmentId, speakerName);
+    }
+  };
 
   // Convert transcripts to segments for virtualized view
   const segments = useMemo(() =>
@@ -51,6 +73,7 @@ export function TranscriptPanel({
       timestamp: t.audio_start_time ?? 0,
       endTime: t.audio_end_time,
       text: t.text,
+      speaker: t.speaker,
       confidence: t.confidence,
     })),
     [transcripts]
@@ -160,6 +183,8 @@ export function TranscriptPanel({
               isStopping={isStopping}
               enableStreaming={isRecording}
               showConfidence={true}
+              speakers={speakers}
+              onAssignSpeaker={handleAssignSpeaker}
             />
           </div>
         </div>

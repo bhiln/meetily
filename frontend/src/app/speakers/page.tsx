@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Search, Pencil, Trash2, User, ChevronRight, MessageSquare, Info } from 'lucide-react';
+import { Users, Plus, Search, Pencil, Trash2, User, ChevronRight, MessageSquare, Info, Mic, StopCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { speakerService, Speaker } from '@/services/speakerService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,12 @@ export default function SpeakersPage() {
   
   const [newSpeakerName, setNewSpeakerName] = useState('');
   const [newSpeakerContext, setNewSpeakerContext] = useState('');
+
+  // Voice recording state
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [recordingProgress, setRecordingVoiceProgress] = useState(0);
+  const [recordingForId, setRecordingForId] = useState<string | null>(null);
+  const [isModelDownloading, setIsModelDownloading] = useState(false);
 
   const fetchSpeakers = async () => {
     try {
@@ -105,6 +111,82 @@ export default function SpeakersPage() {
     setIsEditDialogOpen(true);
   };
 
+  const handleDownloadModel = async () => {
+    try {
+      setIsModelDownloading(true);
+      await speakerService.downloadDiarizationModel();
+      toast.success('Diarization model ready');
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast.error('Failed to download model');
+    } finally {
+      setIsModelDownloading(false);
+    }
+  };
+
+  const handleRecordVoice = async (speaker: Speaker) => {
+    try {
+      setIsRecordingVoice(true);
+      setRecordingForId(speaker.id);
+      setRecordingVoiceProgress(0);
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioContext = new AudioContextClass({ sampleRate: 16000 });
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      let samples: number[] = [];
+      const duration = 5000; // 5 seconds
+      const startTime = Date.now();
+
+      const stopRecording = async () => {
+        source.disconnect();
+        processor.disconnect();
+        stream.getTracks().forEach(track => track.stop());
+        audioContext.close();
+        
+        setIsRecordingVoice(false);
+        setRecordingForId(null);
+        setRecordingVoiceProgress(0);
+
+        try {
+          toast.info('Processing voice profile...');
+          await speakerService.associateVoice(speaker.id, samples);
+          toast.success(`Voice profile saved for ${speaker.name}`);
+          fetchSpeakers();
+        } catch (error) {
+          console.error('Association failed:', error);
+          toast.error('Failed to save voice profile. Make sure the model is downloaded.');
+        }
+      };
+
+      processor.onaudioprocess = (e: any) => {
+        const inputData = e.inputBuffer.getChannelData(0);
+        // Explicitly convert to number array to satisfy TypeScript
+        for (let i = 0; i < inputData.length; i++) {
+          samples.push(inputData[i]);
+        }
+        
+        const elapsed = Date.now() - startTime;
+        setRecordingVoiceProgress(Math.min(100, (elapsed / duration) * 100));
+
+        if (elapsed >= duration) {
+          stopRecording();
+        }
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+    } catch (error) {
+      console.error('Mic access failed:', error);
+      toast.error('Could not access microphone');
+      setIsRecordingVoice(false);
+      setRecordingForId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
       {/* Header */}
@@ -120,45 +202,62 @@ export default function SpeakersPage() {
             </div>
           </div>
 
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Speaker
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Speaker</DialogTitle>
-                <DialogDescription>
-                  Create a voice profile to recognize this speaker in future meetings.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Name</label>
-                  <Input 
-                    placeholder="e.g. John Doe" 
-                    value={newSpeakerName}
-                    onChange={(e) => setNewSpeakerName(e.target.value)}
-                  />
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleDownloadModel}
+              disabled={isModelDownloading}
+              className="text-gray-500 hover:text-blue-600"
+            >
+              {isModelDownloading ? (
+                <RefreshCw className="w-3.5 h-3.5 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5 mr-2" />
+              )}
+              {isModelDownloading ? 'Diarization: Downloading...' : 'Diarization: Sync Model'}
+            </Button>
+            
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 hover:bg-blue-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Speaker
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Speaker</DialogTitle>
+                  <DialogDescription>
+                    Create a voice profile to recognize this speaker in future meetings.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Name</label>
+                    <Input 
+                      placeholder="e.g. John Doe" 
+                      value={newSpeakerName}
+                      onChange={(e) => setNewSpeakerName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Extra Context</label>
+                    <textarea 
+                      className="w-full min-h-[100px] p-3 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      placeholder="e.g. CEO of ACME Inc. Preferred pronoun: they/them"
+                      value={newSpeakerContext}
+                      onChange={(e) => setNewSpeakerContext(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Extra Context</label>
-                  <textarea 
-                    className="w-full min-h-[100px] p-3 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="e.g. CEO of ACME Inc. Preferred pronoun: they/them"
-                    value={newSpeakerContext}
-                    onChange={(e) => setNewSpeakerContext(e.target.value)}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleAddSpeaker}>Create Speaker</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleAddSpeaker}>Create Speaker</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
@@ -182,7 +281,7 @@ export default function SpeakersPage() {
             </div>
           ) : speakers.length === 0 ? (
             <Card className="text-center py-20 bg-white">
-              <CardContent className="flex flex-col items-center">
+              <CardContent className="flex flex-col items-center pt-6">
                 <div className="bg-gray-100 p-4 rounded-full mb-4">
                   <Users className="w-12 h-12 text-gray-400" />
                 </div>
@@ -232,7 +331,7 @@ export default function SpeakersPage() {
                       </CardHeader>
                       <CardContent>
                         {speaker.user_context ? (
-                          <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
+                          <div className="bg-gray-50 p-3 rounded-md border border-gray-100 mb-4">
                             <div className="flex items-center gap-2 mb-1">
                               <Info className="w-3.5 h-3.5 text-blue-500" />
                               <span className="text-[10px] font-bold uppercase text-gray-400">Speaker Context</span>
@@ -242,16 +341,40 @@ export default function SpeakersPage() {
                             </p>
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-400 italic">No extra context provided</p>
+                          <p className="text-sm text-gray-400 italic mb-4">No extra context provided</p>
                         )}
                         
                         <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-100">
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${speaker.voice_profile ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                            <span className="text-[10px] text-gray-500">
-                              {speaker.voice_profile ? 'Voice Profile Active' : 'No Voice Profile'}
+                            <span className="text-[10px] text-gray-500 font-medium">
+                              {speaker.voice_profile ? 'VOICE REGISTERED' : 'NO VOICE PROFILE'}
                             </span>
                           </div>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isRecordingVoice}
+                            onClick={() => handleRecordVoice(speaker)}
+                            className={`h-8 text-[10px] font-bold uppercase transition-all ${
+                              isRecordingVoice && recordingForId === speaker.id
+                                ? 'bg-red-50 border-red-200 text-red-600'
+                                : 'hover:bg-blue-50 hover:text-blue-600'
+                            }`}
+                          >
+                            {isRecordingVoice && recordingForId === speaker.id ? (
+                              <>
+                                <StopCircle className="w-3 h-3 mr-1 animate-pulse" />
+                                {Math.round(recordingProgress)}%
+                              </>
+                            ) : (
+                              <>
+                                <Mic className="w-3 h-3 mr-1" />
+                                {speaker.voice_profile ? 'Re-record' : 'Register Voice'}
+                              </>
+                            )}
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>

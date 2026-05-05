@@ -10,6 +10,7 @@ pub struct SpeechSegment {
     pub samples: Vec<f32>,
     pub start_timestamp_ms: f64,
     pub end_timestamp_ms: f64,
+    pub speaker: Option<String>,
     pub confidence: f32,
 }
 
@@ -24,6 +25,7 @@ pub struct ContinuousVadProcessor {
     in_speech: bool,
     processed_samples: usize,
     speech_start_sample: usize,
+    current_speaker: Option<String>,
     // State tracking for smart logging
     last_logged_state: bool,
 }
@@ -77,6 +79,7 @@ impl ContinuousVadProcessor {
             in_speech: false,
             processed_samples: 0,
             speech_start_sample: 0,
+            current_speaker: None,
             // Initialize state tracking
             last_logged_state: false,
         })
@@ -84,7 +87,10 @@ impl ContinuousVadProcessor {
 
     /// Process incoming audio samples and return any complete speech segments
     /// Handles resampling from input sample rate to 16kHz for VAD processing
-    pub fn process_audio(&mut self, samples: &[f32]) -> Result<Vec<SpeechSegment>> {
+    pub fn process_audio(&mut self, samples: &[f32], speaker: Option<String>) -> Result<Vec<SpeechSegment>> {
+        // Store current speaker
+        self.current_speaker = speaker;
+
         // Resample to 16kHz if needed
         let resampled_audio = if self.sample_rate == 16000 {
             samples.to_vec()
@@ -193,6 +199,7 @@ impl ContinuousVadProcessor {
                 samples: self.current_speech.clone(),
                 start_timestamp_ms: start_ms,
                 end_timestamp_ms: end_ms,
+                speaker: self.current_speaker.clone(),
                 confidence: 0.8, // Estimated confidence for forced end
             };
 
@@ -260,6 +267,7 @@ impl ContinuousVadProcessor {
                             samples: speech_samples,
                             start_timestamp_ms: start_timestamp_ms as f64,
                             end_timestamp_ms: end_timestamp_ms as f64,
+                            speaker: self.current_speaker.clone(),
                             confidence: 0.9, // VAD confidence
                         };
 
@@ -289,7 +297,7 @@ pub fn extract_speech_16k(samples_mono_16k: &[f32]) -> Result<Vec<f32>> {
     let mut processor = ContinuousVadProcessor::new(16000, 400)?;
 
     // Process all audio
-    let mut all_segments = processor.process_audio(samples_mono_16k)?;
+    let mut all_segments = processor.process_audio(samples_mono_16k, None)?;
     let final_segments = processor.flush()?;
     all_segments.extend(final_segments);
 
@@ -363,7 +371,7 @@ where
             chunk_count += 1;
 
             let start_time = std::time::Instant::now();
-            let segments = processor.process_audio(chunk)?;
+            let segments = processor.process_audio(chunk, None)?;
             let elapsed = start_time.elapsed();
 
             // Debug log for chunk processing details
@@ -400,7 +408,7 @@ where
         info!("VAD: Complete! Found {} speech segments", all_segments.len());
     } else {
         // Small file - process all at once
-        all_segments = processor.process_audio(samples_mono_16k)?;
+        all_segments = processor.process_audio(samples_mono_16k, None)?;
         let final_segments = processor.flush()?;
         all_segments.extend(final_segments);
     }
@@ -524,7 +532,7 @@ mod tests {
         // Process in 10-second chunks
         let mut all_segments = Vec::new();
         for (i, chunk) in audio.chunks(chunk_size).enumerate() {
-            let segments = processor.process_audio(chunk).expect("Processing failed");
+            let segments = processor.process_audio(chunk, None).expect("Processing failed");
             println!("Chunk {}: processed {} samples, found {} segments", i, chunk.len(), segments.len());
             all_segments.extend(segments);
         }

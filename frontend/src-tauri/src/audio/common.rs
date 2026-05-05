@@ -35,11 +35,11 @@ pub(crate) async fn unload_engine_after_batch(use_parakeet: bool) {
 }
 
 /// Create transcript segments from transcription results.
-/// Each tuple is (text, start_ms, end_ms) from VAD timestamps.
-pub(crate) fn create_transcript_segments(transcripts: &[(String, f64, f64)]) -> Vec<TranscriptSegment> {
+/// Each tuple is (text, start_ms, end_ms, speaker) from VAD timestamps.
+pub(crate) fn create_transcript_segments(transcripts: &[(String, f64, f64, Option<String>)]) -> Vec<TranscriptSegment> {
     transcripts
         .iter()
-        .map(|(text, start_ms, end_ms)| {
+        .map(|(text, start_ms, end_ms, speaker)| {
             let start_seconds = start_ms / 1000.0;
             let end_seconds = end_ms / 1000.0;
             let duration = end_seconds - start_seconds;
@@ -47,6 +47,7 @@ pub(crate) fn create_transcript_segments(transcripts: &[(String, f64, f64)]) -> 
             TranscriptSegment {
                 id: format!("transcript-{}", Uuid::new_v4()),
                 text: text.trim().to_string(),
+                speaker: speaker.clone(),
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 audio_start_time: Some(start_seconds),
                 audio_end_time: Some(end_seconds),
@@ -69,6 +70,7 @@ pub(crate) fn write_transcripts_json(folder: &Path, segments: &[TranscriptSegmen
             serde_json::json!({
                 "id": s.id,
                 "text": s.text,
+                "speaker": s.speaker,
                 "timestamp": s.timestamp,
                 "audio_start_time": s.audio_start_time,
                 "audio_end_time": s.audio_end_time,
@@ -131,6 +133,7 @@ pub(crate) fn split_segment_at_silence(
                 start_timestamp_ms: chunk_start_ms,
                 end_timestamp_ms: chunk_end_ms,
                 confidence: segment.confidence,
+                speaker: segment.speaker.clone(),
             });
             break;
         }
@@ -189,6 +192,7 @@ pub(crate) fn split_segment_at_silence(
             start_timestamp_ms: chunk_start_ms,
             end_timestamp_ms: chunk_end_ms,
             confidence: segment.confidence,
+            speaker: segment.speaker.clone(),
         });
 
         // Advance position to where the current chunk actually ends

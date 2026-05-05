@@ -20,6 +20,7 @@ interface TranscriptContextType {
   clearTranscripts: () => void;
   currentMeetingId: string | null;
   markMeetingAsSaved: () => Promise<void>;
+  updateTranscriptSpeaker: (segmentId: string, speakerName: string | null) => Promise<void>;
 }
 
 const TranscriptContext = createContext<TranscriptContextType | undefined>(undefined);
@@ -306,6 +307,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
           const newTranscript: Transcript = {
             id: `${Date.now()}-${transcriptCounter++}`,
             text: update.text,
+            speaker: update.speaker,
             timestamp: update.timestamp,
             sequence_id: update.sequence_id,
             chunk_start_time: update.chunk_start_time,
@@ -509,6 +511,43 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
     }
   }, [currentMeetingId]);
 
+  // Update speaker for a specific transcript
+  const updateTranscriptSpeaker = useCallback(async (segmentId: string, speakerName: string | null) => {
+    const transcript = transcriptsRef.current.find(t => t.id === segmentId);
+    const oldSpeaker = transcript?.speaker;
+    const meetingId = currentMeetingId || sessionStorage.getItem('indexeddb_current_meeting_id');
+
+    // If it's a generic speaker (e.g. "Speaker 1"), offer to rename all occurrences
+    const isGeneric = oldSpeaker?.startsWith("Speaker ");
+    
+    if (isGeneric && oldSpeaker && speakerName && meetingId) {
+       // Optimistic UI update for all occurrences
+       setTranscripts(prev => 
+         prev.map(t => t.speaker === oldSpeaker ? { ...t, speaker: speakerName } : t)
+       );
+       
+       try {
+         await transcriptService.renameSpeaker(meetingId, oldSpeaker, speakerName);
+         return;
+       } catch (err) {
+         console.warn("Failed to bulk rename speaker:", err);
+         // Fallback to single update if bulk fails
+       }
+    }
+
+    // Update React state immediately for optimistic UI (single segment)
+    setTranscripts(prev => 
+      prev.map(t => t.id === segmentId ? { ...t, speaker: speakerName || undefined } : t)
+    );
+
+    // Also update the database if it's already saved
+    try {
+      await transcriptService.updateTranscriptSpeaker(segmentId, speakerName);
+    } catch (err) {
+      console.warn("Failed to update speaker in DB (might be live/unsaved recording):", err);
+    }
+  }, [currentMeetingId]);
+
   const value: TranscriptContextType = {
     transcripts,
     transcriptsRef,
@@ -521,6 +560,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
     clearTranscripts,
     currentMeetingId,
     markMeetingAsSaved,
+    updateTranscriptSpeaker,
   };
 
   return (

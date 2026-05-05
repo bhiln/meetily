@@ -88,6 +88,7 @@ impl MeetingsRepository {
                 .map(|t| MeetingTranscript {
                     id: t.id,
                     text: t.transcript,
+                    speaker: t.speaker,
                     timestamp: t.timestamp,
                     audio_start_time: t.audio_start_time,
                     audio_end_time: t.audio_end_time,

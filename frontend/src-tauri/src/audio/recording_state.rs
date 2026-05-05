@@ -21,6 +21,7 @@ pub struct AudioChunk {
     pub sample_rate: u32,
     pub timestamp: f64,
     pub chunk_id: u64,
+    pub speaker: Option<String>,
     pub device_type: DeviceType,
 }
 

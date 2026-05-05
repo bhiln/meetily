@@ -5,7 +5,7 @@
 use super::engine::TranscriptionEngine;
 use super::provider::TranscriptionError;
 use crate::audio::AudioChunk;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -28,6 +28,7 @@ pub struct TranscriptUpdate {
     pub text: String,
     pub timestamp: String, // Wall-clock time for reference (e.g., "14:30:05")
     pub source: String,
+    pub speaker: Option<String>,
     pub sequence_id: u64,
     pub chunk_start_time: f64, // Legacy field, kept for compatibility
     pub is_partial: bool,
@@ -143,6 +144,25 @@ pub fn start_transcription_task<R: Runtime>(
                             let chunk_timestamp = chunk.timestamp;
                             let chunk_duration = chunk.data.len() as f64 / chunk.sample_rate as f64;
 
+                            // NEW: Speaker Diarization
+                            let mut identified_speaker = None;
+                            if let Some(service) = crate::audio::diarization::get_diarization_service() {
+                                match service.compute_embedding(&chunk.data) {
+                                    Ok(embedding) => {
+                                        if let Some(name) = service.identify_speaker(&embedding) {
+                                            info!("👤 Diarization: Identified speaker '{}' for chunk {}", name, chunk.chunk_id);
+                                            identified_speaker = Some(name);
+                                        } else {
+                                            // Provide some insight into the best match if possible, or just note unknown
+                                            info!("👤 Diarization: Unknown speaker for chunk {} (duration {:.2}s)", chunk.chunk_id, chunk_duration);
+                                        }
+                                    },
+                                    Err(e) => {
+                                        info!("👤 Diarization skipped for chunk {} (duration {:.2}s) - {}", chunk.chunk_id, chunk_duration, e);
+                                    }
+                                }
+                            }
+
                             // Transcribe with provider-agnostic approach
                             match transcribe_chunk_with_provider(
                                 &engine_clone,
@@ -209,6 +229,7 @@ pub fn start_transcription_task<R: Runtime>(
                                             text: transcript,
                                             timestamp: format_current_timestamp(), // Wall-clock for reference
                                             source: "Audio".to_string(),
+                                            speaker: identified_speaker,
                                             sequence_id,
                                             chunk_start_time: chunk_timestamp, // Legacy compatibility
                                             is_partial,
