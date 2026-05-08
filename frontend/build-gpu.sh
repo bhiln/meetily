@@ -69,16 +69,9 @@ fi
 if [ -z "$TAURI_GPU_FEATURE" ]; then
     echo -e "${BLUE}🔍 Detecting GPU features...${NC}"
     # Run the detection script and capture output
-    # We need to run it from frontend dir
-    if [ "$FRONTEND_DIR" != "." ]; then
-        cd "$FRONTEND_DIR"
-    fi
+    # We are already in FRONTEND_DIR if it wasn't "."
     
     TAURI_GPU_FEATURE=$(node scripts/auto-detect-gpu.js)
-    
-    if [ "$FRONTEND_DIR" != "." ]; then
-        cd ..
-    fi
 fi
 
 if [ -n "$TAURI_GPU_FEATURE" ]; then
@@ -92,15 +85,17 @@ fi
 echo ""
 echo -e "${BLUE}🦙 Building llama-helper sidecar (release)...${NC}"
 
-HELPER_DIR="llama-helper"
-if [ ! -d "$HELPER_DIR" ]; then
-    # Try to find it relative to script location
-    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-    HELPER_DIR="$SCRIPT_DIR/../llama-helper"
+# Find workspace root - if we are in frontend, it's one level up
+if [ "$FRONTEND_DIR" == "frontend" ]; then
+    WORKSPACE_ROOT=".."
+else
+    WORKSPACE_ROOT="."
 fi
 
+HELPER_DIR="$WORKSPACE_ROOT/llama-helper"
+
 if [ ! -d "$HELPER_DIR" ]; then
-    echo -e "${RED}❌ Could not find llama-helper directory${NC}"
+    echo -e "${RED}❌ Could not find llama-helper directory at $HELPER_DIR${NC}"
     exit 1
 fi
 
@@ -150,7 +145,12 @@ fi
 
 # The binary is in the workspace target directory, which is one level up from frontend
 # if we are in frontend dir.
-WORKSPACE_ROOT="$FRONTEND_DIR/.."
+if [ "$FRONTEND_DIR" == "frontend" ]; then
+    WORKSPACE_ROOT=".."
+else
+    WORKSPACE_ROOT="."
+fi
+
 SRC_PATH="$WORKSPACE_ROOT/target/release/$BASE_BINARY"
 DEST_PATH="$BINARIES_DIR/$SIDECAR_BINARY"
 
@@ -165,8 +165,8 @@ if [ -f "$SRC_PATH" ]; then
 else
     echo -e "${RED}❌ Binary not found at $SRC_PATH${NC}"
     # List contents of target/release to help debugging
-    echo -e "${YELLOW}Contents of target/release:${NC}"
-    ls -la "$WORKSPACE_ROOT/target/release/" || ls -la "target/release/"
+    echo -e "${YELLOW}Contents of $WORKSPACE_ROOT/target/release:${NC}"
+    ls -la "$WORKSPACE_ROOT/target/release/"
     exit 1
 fi
 

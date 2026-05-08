@@ -1,4 +1,4 @@
-use crate::summary::templates;
+use crate::summary::templates::{self, Template, TemplateSection};
 use serde::{Deserialize, Serialize};
 use tauri::Runtime;
 use tracing::{info, warn};
@@ -14,6 +14,9 @@ pub struct TemplateInfo {
 
     /// Brief description of the template's purpose
     pub description: String,
+
+    /// Whether this is a custom (user-defined) template
+    pub is_custom: bool,
 }
 
 /// Detailed template structure for preview/debugging
@@ -29,7 +32,13 @@ pub struct TemplateDetails {
     pub description: String,
 
     /// List of section titles in order
-    pub sections: Vec<String>,
+    pub section_titles: Vec<String>,
+
+    /// Full section details
+    pub sections: Vec<TemplateSection>,
+
+    /// Whether this is a custom template
+    pub is_custom: bool,
 }
 
 /// Lists all available templates
@@ -45,16 +54,23 @@ pub async fn api_list_templates<R: Runtime>(
 ) -> Result<Vec<TemplateInfo>, String> {
     info!("api_list_templates called");
 
-    let templates = templates::list_templates();
+    let ids = templates::list_template_ids();
+    let mut template_infos = Vec::new();
 
-    let template_infos: Vec<TemplateInfo> = templates
-        .into_iter()
-        .map(|(id, name, description)| TemplateInfo {
-            id,
-            name,
-            description,
-        })
-        .collect();
+    let builtin_ids = templates::list_builtin_template_ids();
+
+    for id in ids {
+        if let Ok(template) = templates::get_template(&id) {
+            let is_custom = !builtin_ids.contains(&id.as_str());
+
+            template_infos.push(TemplateInfo {
+                id,
+                name: template.name,
+                description: template.description,
+                is_custom,
+            });
+        }
+    }
 
     info!("Found {} available templates", template_infos.len());
 
@@ -83,16 +99,62 @@ pub async fn api_get_template_details<R: Runtime>(
         .map(|section| section.title.clone())
         .collect();
 
+    let builtin_ids = templates::list_builtin_template_ids();
+    let is_custom = !builtin_ids.contains(&template_id.as_str());
+
     let details = TemplateDetails {
         id: template_id,
         name: template.name,
         description: template.description,
-        sections: section_titles,
+        section_titles,
+        sections: template.sections,
+        is_custom,
     };
 
     info!("Retrieved template details for '{}'", details.name);
 
     Ok(details)
+}
+
+/// Saves a custom template
+///
+/// # Arguments
+/// * `template_id` - Unique identifier for the template
+/// * `template` - Template structure to save
+#[tauri::command]
+pub async fn api_save_template<R: Runtime>(
+    _app: tauri::AppHandle<R>,
+    template_id: String,
+    template: Template,
+) -> Result<(), String> {
+    info!("api_save_template called for template_id: {}", template_id);
+    
+    // Ensure ID is safe for filename
+    if template_id.is_empty() || template_id.contains('/') || template_id.contains('\\') {
+        return Err("Invalid template ID".to_string());
+    }
+
+    templates::save_template(&template_id, &template)
+}
+
+/// Deletes a custom template
+///
+/// # Arguments
+/// * `template_id` - Unique identifier for the template
+#[tauri::command]
+pub async fn api_delete_template<R: Runtime>(
+    _app: tauri::AppHandle<R>,
+    template_id: String,
+) -> Result<(), String> {
+    info!("api_delete_template called for template_id: {}", template_id);
+    
+    // Prevent deleting built-in templates (though save_template only works on custom ones)
+    let builtins = ["daily_standup", "standard_meeting", "executive_summary", "action_oriented"];
+    if builtins.contains(&template_id.as_str()) {
+        return Err("Cannot delete built-in templates".to_string());
+    }
+
+    templates::delete_template(&template_id)
 }
 
 /// Validates a custom template JSON string

@@ -29,6 +29,66 @@ fn get_custom_templates_dir() -> Option<PathBuf> {
     Some(path)
 }
 
+/// Save a template to the user's custom templates directory
+///
+/// # Arguments
+/// * `template_id` - Template identifier (without .json extension)
+/// * `template` - Template struct to save
+///
+/// # Returns
+/// Ok(()) if successful, Err(error_message) otherwise
+pub fn save_template(template_id: &str, template: &Template) -> Result<(), String> {
+    info!("Saving custom template: {}", template_id);
+
+    // Validate before saving
+    template.validate()?;
+
+    let custom_dir = get_custom_templates_dir()
+        .ok_or_else(|| "Could not determine custom templates directory".to_string())?;
+
+    // Ensure directory exists
+    if !custom_dir.exists() {
+        std::fs::create_dir_all(&custom_dir)
+            .map_err(|e| format!("Failed to create custom templates directory: {}", e))?;
+    }
+
+    let template_path = custom_dir.join(format!("{}.json", template_id));
+    let json_content = serde_json::to_string_pretty(template)
+        .map_err(|e| format!("Failed to serialize template: {}", e))?;
+
+    std::fs::write(&template_path, json_content)
+        .map_err(|e| format!("Failed to write template file: {}", e))?;
+
+    info!("Custom template '{}' saved to {:?}", template_id, template_path);
+    Ok(())
+}
+
+/// Delete a template from the user's custom templates directory
+///
+/// # Arguments
+/// * `template_id` - Template identifier (without .json extension)
+///
+/// # Returns
+/// Ok(()) if successful, Err(error_message) otherwise
+pub fn delete_template(template_id: &str) -> Result<(), String> {
+    info!("Deleting custom template: {}", template_id);
+
+    let custom_dir = get_custom_templates_dir()
+        .ok_or_else(|| "Could not determine custom templates directory".to_string())?;
+
+    let template_path = custom_dir.join(format!("{}.json", template_id));
+
+    if !template_path.exists() {
+        return Err(format!("Custom template '{}' does not exist", template_id));
+    }
+
+    std::fs::remove_file(&template_path)
+        .map_err(|e| format!("Failed to delete template file: {}", e))?;
+
+    info!("Custom template '{}' deleted", template_id);
+    Ok(())
+}
+
 /// Load a template from the bundled resources directory
 ///
 /// # Arguments
