@@ -71,6 +71,7 @@ const TranscriptSegment = memo(function TranscriptSegment({
     confidence,
     isStreaming,
     showConfidence,
+    isNote,
 }: {
     id: string;
     timestamp: number;
@@ -78,11 +79,19 @@ const TranscriptSegment = memo(function TranscriptSegment({
     confidence?: number;
     isStreaming: boolean;
     showConfidence: boolean;
+    isNote?: boolean;
 }) {
-    const displayText = cleanStopWords(text) || (text.trim() === '' ? '[Silence]' : text);
+    let displayText = cleanStopWords(text) || (text.trim() === '' ? '[Silence]' : text);
+
+    // Filter out [user-note] prefix from display
+    if (isNote && displayText.startsWith('[user-note] ')) {
+        displayText = displayText.substring('[user-note] '.length);
+    } else if (isNote && displayText.startsWith('[user-note]')) {
+        displayText = displayText.substring('[user-note]'.length);
+    }
 
     return (
-        <div id={`segment-${id}`} className="mb-3">
+        <div id={`segment-${id}`} className={`mb-3 rounded-lg transition-colors ${isNote ? 'bg-amber-50/80 border border-amber-100 p-2 mx-[-4px]' : ''}`}>
             <div className="flex items-start gap-2">
                 <Tooltip>
                     <TooltipTrigger>
@@ -91,18 +100,21 @@ const TranscriptSegment = memo(function TranscriptSegment({
                         </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                        {confidence !== undefined && showConfidence && (
-                            <ConfidenceIndicator confidence={confidence} showIndicator={showConfidence} />
-                        )}
+                        <div className="space-y-1">
+                            {confidence !== undefined && showConfidence && (
+                                <ConfidenceIndicator confidence={confidence} showIndicator={showConfidence} />
+                            )}
+                            {isNote && <p className="text-xs font-medium text-amber-700">User Note</p>}
+                        </div>
                     </TooltipContent>
                 </Tooltip>
                 <div className="flex-1">
                     {isStreaming ? (
-                        <div className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
-                            <p className="text-base text-gray-800 leading-relaxed">{displayText}</p>
+                        <div className={`${isNote ? 'bg-amber-100/50' : 'bg-gray-100'} border border-gray-200 rounded-lg px-3 py-2`}>
+                            <p className={`text-base leading-relaxed ${isNote ? 'text-amber-900 font-medium' : 'text-gray-800'}`}>{displayText}</p>
                         </div>
                     ) : (
-                        <p className="text-base text-gray-800 leading-relaxed">{displayText}</p>
+                        <p className={`text-base leading-relaxed ${isNote ? 'text-amber-900 font-medium italic' : 'text-gray-800'}`}>{displayText}</p>
                     )}
                 </div>
             </div>
@@ -296,6 +308,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         confidence={segment.confidence}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
+                                        isNote={segment.isNote}
                                     />
                                 </div>
                             );
@@ -352,6 +365,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         confidence={segment.confidence}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
+                                        isNote={segment.isNote}
                                     />
                                 </motion.div>
                             );

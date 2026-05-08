@@ -40,9 +40,11 @@ command_exists() {
 # Find the correct directory - we need to be in frontend root for npm commands
 if [ -f "package.json" ]; then
     FRONTEND_DIR="."
+    WORKSPACE_ROOT="."
 elif [ -f "frontend/package.json" ]; then
     cd frontend || { echo -e "${RED}❌ Failed to change to frontend directory${NC}"; exit 1; }
-    FRONTEND_DIR="frontend"
+    FRONTEND_DIR="."
+    WORKSPACE_ROOT=".."
 else
     echo -e "${RED}❌ Could not find package.json${NC}"
     echo -e "${RED}   Make sure you're in the project root or frontend directory${NC}"
@@ -84,15 +86,10 @@ fi
 echo ""
 echo -e "${BLUE}🦙 Building llama-helper sidecar (debug)...${NC}"
 
-HELPER_DIR="llama-helper"
-if [ ! -d "$HELPER_DIR" ]; then
-    # Try to find it relative to script location
-    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-    HELPER_DIR="$SCRIPT_DIR/../llama-helper"
-fi
+HELPER_DIR="$WORKSPACE_ROOT/llama-helper"
 
 if [ ! -d "$HELPER_DIR" ]; then
-    echo -e "${RED}❌ Could not find llama-helper directory${NC}"
+    echo -e "${RED}❌ Could not find llama-helper directory at $HELPER_DIR${NC}"
     exit 1
 fi
 
@@ -140,16 +137,9 @@ if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
     SIDECAR_BINARY="llama-helper-$TARGET_TRIPLE.exe"
 fi
 
-# The binary is in the workspace target directory, which is one level up from frontend
-# if we are in frontend dir.
-WORKSPACE_ROOT="$FRONTEND_DIR/.."
+# The binary is in the workspace target directory
 SRC_PATH="$WORKSPACE_ROOT/target/debug/$BASE_BINARY"
 DEST_PATH="$BINARIES_DIR/$SIDECAR_BINARY"
-
-if [ ! -f "$SRC_PATH" ]; then
-    # Fallback: check if we are running from root and target is in root
-    SRC_PATH="target/debug/$BASE_BINARY"
-fi
 
 if [ -f "$SRC_PATH" ]; then
     cp "$SRC_PATH" "$DEST_PATH"
@@ -157,8 +147,8 @@ if [ -f "$SRC_PATH" ]; then
 else
     echo -e "${RED}❌ Binary not found at $SRC_PATH${NC}"
     # List contents of target/debug to help debugging
-    echo -e "${YELLOW}Contents of target/debug:${NC}"
-    ls -la "$WORKSPACE_ROOT/target/debug/" || ls -la "target/debug/"
+    echo -e "${YELLOW}Contents of $WORKSPACE_ROOT/target/debug:${NC}"
+    ls -la "$WORKSPACE_ROOT/target/debug/"
     exit 1
 fi
 

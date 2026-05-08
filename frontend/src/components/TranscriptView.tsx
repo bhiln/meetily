@@ -263,15 +263,32 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
       {transcripts?.map((transcript, index) => {
         const isStreaming = streamingTranscript?.id === transcript.id;
         const textToShow = isStreaming ? streamingTranscript.visibleText : transcript.text;
+        const isNote = transcript.text.startsWith('[user-note]');
+
         // Clean up text for display - remove repetitions and filler words
-        const filteredText = cleanStopWords(textToShow);
+        let filteredText = cleanStopWords(textToShow);
+
+        // Filter out [user-note] prefix from display
+        if (isNote && filteredText.startsWith('[user-note] ')) {
+          filteredText = filteredText.substring('[user-note] '.length);
+        } else if (isNote && filteredText.startsWith('[user-note]')) {
+          filteredText = filteredText.substring('[user-note]'.length);
+        }
+
         // Show [Silence] ONLY if the ORIGINAL transcript was empty (not just after filtering)
         const originalWasEmpty = transcript.text.trim() === '';
         const displayText = originalWasEmpty && !isStreaming ? '[Silence]' : filteredText;
 
         // Sizer text: use cleaned version for proper sizing, fallback to [Silence] only if original was empty
-        const sizerText = cleanStopWords(isStreaming ? streamingTranscript.fullText : transcript.text)
-          || (originalWasEmpty && !isStreaming ? '[Silence]' : '');
+        let sizerText = cleanStopWords(isStreaming ? streamingTranscript.fullText : transcript.text);
+        if (isNote && sizerText.startsWith('[user-note] ')) {
+          sizerText = sizerText.substring('[user-note] '.length);
+        } else if (isNote && sizerText.startsWith('[user-note]')) {
+          sizerText = sizerText.substring('[user-note]'.length);
+        }
+        if (!sizerText && originalWasEmpty && !isStreaming) {
+          sizerText = '[Silence]';
+        }
 
         return (
           <motion.div
@@ -279,7 +296,7 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.15 }}
-            className="mb-3"
+            className={`mb-3 rounded-lg transition-colors ${isNote ? 'bg-amber-50/80 border border-amber-100 p-2 mx-[-8px]' : ''}`}
           >
             <div className="flex items-start gap-2">
               <Tooltip>
@@ -291,28 +308,31 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {transcript.duration !== undefined && (
-                    <span className="text-xs text-gray-400">
-                      {transcript.duration.toFixed(1)}s
-                      {transcript.confidence !== undefined && (
-                        <ConfidenceIndicator
-                          confidence={transcript.confidence}
-                          showIndicator={showConfidence}
-                        />
-                      )}
-                    </span>
-                  )}
+                  <div className="space-y-1">
+                    {transcript.duration !== undefined && (
+                      <span className="text-xs text-gray-400">
+                        {transcript.duration.toFixed(1)}s
+                      </span>
+                    )}
+                    {transcript.confidence !== undefined && (
+                      <ConfidenceIndicator
+                        confidence={transcript.confidence}
+                        showIndicator={showConfidence}
+                      />
+                    )}
+                    {isNote && <p className="text-xs font-medium text-amber-700">User Note</p>}
+                  </div>
                 </TooltipContent>
               </Tooltip>
               <div className="flex-1">
                 {isStreaming ? (
                   // Streaming transcript - show in bubble (full width)
-                  <div className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
+                  <div className={`${isNote ? 'bg-amber-100/50' : 'bg-gray-100'} border border-gray-200 rounded-lg px-3 py-2`}>
                     <div className="relative">
-                      <p className="text-base text-gray-800 leading-relaxed" style={{ visibility: 'hidden' }}>
+                      <p className={`text-base leading-relaxed ${isNote ? 'text-amber-900 font-medium' : 'text-gray-800'}`} style={{ visibility: 'hidden' }}>
                         {sizerText}
                       </p>
-                      <p className="text-base text-gray-800 leading-relaxed absolute top-0 left-0">
+                      <p className={`text-base leading-relaxed absolute top-0 left-0 ${isNote ? 'text-amber-900 font-medium' : 'text-gray-800'}`}>
                         {displayText}
                       </p>
                     </div>
@@ -320,10 +340,10 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
                 ) : (
                   // Regular transcript - simple text
                   <div className="relative">
-                    <p className="text-base text-gray-800 leading-relaxed" style={{ visibility: 'hidden' }}>
+                    <p className={`text-base leading-relaxed ${isNote ? 'text-amber-900 font-medium' : 'text-gray-800'}`} style={{ visibility: 'hidden' }}>
                       {sizerText}
                     </p>
-                    <p className="text-base text-gray-800 leading-relaxed absolute top-0 left-0">
+                    <p className={`text-base leading-relaxed absolute top-0 left-0 ${isNote ? 'text-amber-900 font-medium italic' : 'text-gray-800'}`}>
                       {displayText}
                     </p>
                   </div>

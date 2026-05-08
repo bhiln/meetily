@@ -52,6 +52,7 @@ export function TranscriptPanel({
       endTime: t.audio_end_time,
       text: t.text,
       confidence: t.confidence,
+      isNote: t.text.startsWith('[user-note]'),
     })),
     [transcripts]
   );

@@ -72,10 +72,16 @@ impl Template {
 
     /// Generates a clean markdown template structure
     pub fn to_markdown_structure(&self) -> String {
-        let mut markdown = String::from("# <Add Title here>\n\n");
+        let mut markdown = String::from("# <AI-Generated Meeting Title>\n\n");
 
         for section in &self.sections {
-            markdown.push_str(&format!("**{}**\n\n", section.title));
+            markdown.push_str(&format!("### {}\n", section.title));
+            match section.format.as_str() {
+                "list" => markdown.push_str("- <Item 1>\n- <Item 2>\n\n"),
+                "paragraph" => markdown.push_str("<Paragraph content here>\n\n"),
+                "string" => markdown.push_str("<Single line content here>\n\n"),
+                _ => markdown.push_str("\n"),
+            }
         }
 
         markdown
@@ -84,13 +90,20 @@ impl Template {
     /// Generates section-specific instructions for the LLM
     pub fn to_section_instructions(&self) -> String {
         let mut instructions = String::from(
-            "- **For the main title (`# [AI-Generated Title]`):** Analyze the entire transcript and create a concise, descriptive title for the meeting.\n"
+            "- **For the main title (`# [Title]`):** Analyze the entire transcript and create a concise, descriptive title for the meeting.\n"
         );
 
         for section in &self.sections {
+            let format_instruction = match section.format.as_str() {
+                "list" => "This section MUST be formatted as a bulleted list using the '-' character for each item.",
+                "paragraph" => "This section MUST be formatted as one or more cohesive paragraphs.",
+                "string" => "This section MUST be a single, concise line of text.",
+                _ => "",
+            };
+
             instructions.push_str(&format!(
-                "- **For the '{}' section:** {}.\n",
-                section.title, section.instruction
+                "- **For the '{}' section:** {}. {}.\n",
+                section.title, section.instruction, format_instruction
             ));
 
             // Add item format instructions if present
@@ -99,7 +112,7 @@ impl Template {
 
             if let Some(format) = item_format {
                 instructions.push_str(&format!(
-                    "  - Items in this section should follow the format: `{}`.\n",
+                    "  - Each list item MUST strictly follow this format: `{}`.\n",
                     format
                 ));
             }

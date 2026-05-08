@@ -419,15 +419,49 @@ async fn run_retranscription<R: Runtime>(
     emit_progress(&app, &meeting_id, "saving", 80, "Saving transcripts...");
 
     // Create transcript segments with proper timestamps from VAD
-    let segments = create_transcript_segments(&all_transcripts);
+    let mut segments = create_transcript_segments(&all_transcripts);
 
     // Save to database
     let app_state = app
         .try_state::<AppState>()
         .ok_or_else(|| anyhow!("App state not available"))?;
 
-    // Wrap delete+insert+update in a transaction to prevent data loss
     let pool = app_state.db_manager.pool();
+
+    // Preserve [user-note] entries from existing transcripts
+    match sqlx::query_as::<_, crate::database::models::Transcript>(
+        "SELECT * FROM transcripts WHERE meeting_id = ? AND transcript LIKE '[user-note]%'"
+    )
+    .bind(&meeting_id)
+    .fetch_all(pool)
+    .await {
+        Ok(notes) => {
+            if !notes.is_empty() {
+                info!("Found {} user notes to preserve", notes.len());
+                for note in notes {
+                    segments.push(crate::api::TranscriptSegment {
+                        id: note.id,
+                        text: note.transcript,
+                        timestamp: note.timestamp,
+                        audio_start_time: note.audio_start_time,
+                        audio_end_time: note.audio_end_time,
+                        duration: note.duration,
+                    });
+                }
+                // Re-sort segments by audio_start_time to ensure order is preserved
+                segments.sort_by(|a, b| {
+                    a.audio_start_time
+                        .partial_cmp(&b.audio_start_time)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
+        }
+        Err(e) => {
+            warn!("Failed to fetch existing user notes to preserve: {}", e);
+        }
+    }
+
+    // Wrap delete+insert+update in a transaction to prevent data loss
     let mut conn = pool.acquire().await.map_err(|e| anyhow!("DB error: {}", e))?;
     let mut tx = sqlx::Connection::begin(&mut *conn)
         .await

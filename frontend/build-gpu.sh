@@ -39,12 +39,14 @@ command_exists() {
 # Find the correct directory - we need to be in frontend root for npm commands
 if [ -f "package.json" ]; then
   FRONTEND_DIR="."
+  WORKSPACE_ROOT="."
 elif [ -f "frontend/package.json" ]; then
   cd frontend || {
     echo -e "${RED}❌ Failed to change to frontend directory${NC}"
     exit 1
   }
-  FRONTEND_DIR="frontend"
+  FRONTEND_DIR="."
+  WORKSPACE_ROOT=".."
 else
   echo -e "${RED}❌ Could not find package.json${NC}"
   echo -e "${RED}   Make sure you're in the project root or frontend directory${NC}"
@@ -69,8 +71,6 @@ fi
 if [ -z "$TAURI_GPU_FEATURE" ]; then
     echo -e "${BLUE}🔍 Detecting GPU features...${NC}"
     # Run the detection script and capture output
-    # We are already in FRONTEND_DIR if it wasn't "."
-    
     TAURI_GPU_FEATURE=$(node scripts/auto-detect-gpu.js)
 fi
 
@@ -84,13 +84,6 @@ fi
 # Build llama-helper
 echo ""
 echo -e "${BLUE}🦙 Building llama-helper sidecar (release)...${NC}"
-
-# Find workspace root - if we are in frontend, it's one level up
-if [ "$FRONTEND_DIR" == "frontend" ]; then
-    WORKSPACE_ROOT=".."
-else
-    WORKSPACE_ROOT="."
-fi
 
 HELPER_DIR="$WORKSPACE_ROOT/llama-helper"
 
@@ -143,21 +136,9 @@ if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
     SIDECAR_BINARY="llama-helper-$TARGET_TRIPLE.exe"
 fi
 
-# The binary is in the workspace target directory, which is one level up from frontend
-# if we are in frontend dir.
-if [ "$FRONTEND_DIR" == "frontend" ]; then
-    WORKSPACE_ROOT=".."
-else
-    WORKSPACE_ROOT="."
-fi
-
+# The binary is in the workspace target directory
 SRC_PATH="$WORKSPACE_ROOT/target/release/$BASE_BINARY"
 DEST_PATH="$BINARIES_DIR/$SIDECAR_BINARY"
-
-if [ ! -f "$SRC_PATH" ]; then
-    # Fallback: check if we are running from root and target is in root
-    SRC_PATH="target/release/$BASE_BINARY"
-fi
 
 if [ -f "$SRC_PATH" ]; then
     cp "$SRC_PATH" "$DEST_PATH"

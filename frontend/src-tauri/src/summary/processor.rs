@@ -398,6 +398,38 @@ pub async fn generate_meeting_summary(
         let clean_template_markdown = template.to_markdown_structure();
         let section_instructions = template.to_section_instructions();
 
+        // Inject Speaker Context if pool is available
+        let mut speaker_context = String::new();
+        if let Some(p) = pool {
+            if let Ok(speakers) = SpeakersRepository::get_all_speakers(p).await {
+                let mut mentioned_speakers = Vec::new();
+                let text_lower = text.to_lowercase();
+                for speaker in speakers {
+                    let name_mention = format!("@{}", speaker.name).to_lowercase();
+                    let name_lower = speaker.name.to_lowercase();
+                    // Check for @Mention or just the name if it's unique enough
+                    if text_lower.contains(&name_mention) || (speaker.name.len() > 3 && text_lower.contains(&name_lower)) {
+                        mentioned_speakers.push(speaker);
+                    }
+                }
+
+                if !mentioned_speakers.is_empty() {
+                    let mut context_block = String::from("\n\n**CONTEXT: PEOPLE MENTIONED IN THIS MEETING**\n");
+                    let mut has_context = false;
+                    for speaker in mentioned_speakers {
+                        if let Some(context) = &speaker.user_context {
+                            context_block.push_str(&format!("- **{}**: {}\n", speaker.name, context));
+                            has_context = true;
+                        }
+                    }
+                    if has_context {
+                        speaker_context = context_block;
+                        info!("✓ Injected context for {} mentioned speakers", speaker_context.lines().count() - 1);
+                    }
+                }
+            }
+        }
+
         let final_system_prompt = format!(
             r#"You are an expert meeting summarizer. Generate a final meeting report by filling in the provided Markdown template based on the source text.
 
@@ -408,6 +440,9 @@ pub async fn generate_meeting_summary(
 4. If a section has no relevant info, write "None noted in this section."
 5. Output **only** the completed Markdown report.
 6. If unsure about something, omit it.
+7. Pay special attention to [user-note] entries in the transcript—these are high-priority manual notes.
+8. Use the provided information about people mentioned in the meeting to ensure accuracy in roles and responsibilities.
+9. Adhere STRICTLY to the requested format (Bullet List, Paragraph, or Single Line) for each section.
 
 **SECTION-SPECIFIC INSTRUCTIONS:**
 {section_instructions}
@@ -421,33 +456,8 @@ pub async fn generate_meeting_summary(
             "<transcript_chunks>\n{content_to_summarize}\n</transcript_chunks>\n"
         );
 
-        // Inject Speaker Context if pool is available
-        if let Some(p) = pool {
-            if let Ok(speakers) = SpeakersRepository::get_all_speakers(p).await {
-                let mut mentioned_speakers = Vec::new();
-                let text_lower = text.to_lowercase();
-                for speaker in speakers {
-                    let name_mention = format!("@{}", speaker.name).to_lowercase();
-                    let name_lower = speaker.name.to_lowercase();
-                    if text_lower.contains(&name_lower) || text_lower.contains(&name_mention) {
-                        mentioned_speakers.push(speaker);
-                    }
-                }
-
-                if !mentioned_speakers.is_empty() {
-                    let mut context_block = String::from("\n\nInformation about people mentioned in this meeting:\n");
-                    let mut has_context = false;
-                    for speaker in mentioned_speakers {
-                        if let Some(context) = &speaker.user_context {
-                            context_block.push_str(&format!("- {}: {}\n", speaker.name, context));
-                            has_context = true;
-                        }
-                    }
-                    if has_context {
-                        final_user_prompt.push_str(&context_block);
-                    }
-                }
-            }
+        if !speaker_context.is_empty() {
+            final_user_prompt.push_str(&speaker_context);
         }
 
         if !custom_prompt.is_empty() {
