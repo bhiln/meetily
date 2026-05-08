@@ -146,19 +146,21 @@ pub fn start_transcription_task<R: Runtime>(
 
                             // NEW: Speaker Diarization
                             let mut identified_speaker = None;
-                            if let Some(service) = crate::audio::diarization::get_diarization_service() {
-                                match service.compute_embedding(&chunk.data) {
-                                    Ok(embedding) => {
-                                        if let Some(name) = service.identify_speaker(&embedding) {
-                                            info!("👤 Diarization: Identified speaker '{}' for chunk {}", name, chunk.chunk_id);
-                                            identified_speaker = Some(name);
-                                        } else {
-                                            // Provide some insight into the best match if possible, or just note unknown
-                                            info!("👤 Diarization: Unknown speaker for chunk {} (duration {:.2}s)", chunk.chunk_id, chunk_duration);
+                            if crate::is_speech_identification_enabled() {
+                                if let Some(service) = crate::audio::diarization::get_diarization_service() {
+                                    match service.compute_embedding(&chunk.data) {
+                                        Ok(embedding) => {
+                                            if let Some(name) = service.identify_speaker(&embedding) {
+                                                info!("👤 Diarization: Identified speaker '{}' for chunk {}", name, chunk.chunk_id);
+                                                identified_speaker = Some(name);
+                                            } else {
+                                                // Provide some insight into the best match if possible, or just note unknown
+                                                info!("👤 Diarization: Unknown speaker for chunk {} (duration {:.2}s)", chunk.chunk_id, chunk_duration);
+                                            }
+                                        },
+                                        Err(e) => {
+                                            info!("👤 Diarization skipped for chunk {} (duration {:.2}s) - {}", chunk.chunk_id, chunk_duration, e);
                                         }
-                                    },
-                                    Err(e) => {
-                                        info!("👤 Diarization skipped for chunk {} (duration {:.2}s) - {}", chunk.chunk_id, chunk_duration, e);
                                     }
                                 }
                             }

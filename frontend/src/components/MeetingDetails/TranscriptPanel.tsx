@@ -8,6 +8,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { transcriptService } from '@/services/transcriptService';
 
 import { Speaker, speakerService } from '@/services/speakerService';
+import { useConfig } from '@/contexts/ConfigContext';
 
 interface TranscriptPanelProps {
   transcripts: Transcript[];
@@ -52,6 +53,7 @@ export function TranscriptPanel({
   meetingFolderPath,
   onRefetchTranscripts,
 }: TranscriptPanelProps) {
+  const { betaFeatures } = useConfig();
   
   // Speakers state
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
@@ -130,6 +132,7 @@ export function TranscriptPanel({
           isStopping={false}
           enableStreaming={false}
           showConfidence={true}
+          showSpeakers={betaFeatures.speechIdentification}
           disableAutoScroll={disableAutoScroll}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}

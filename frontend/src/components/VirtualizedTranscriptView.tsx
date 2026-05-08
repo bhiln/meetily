@@ -29,6 +29,8 @@ export interface VirtualizedTranscriptViewProps {
     enableStreaming?: boolean;
     /** Show confidence indicators */
     showConfidence?: boolean;
+    /** Show speaker identification UI */
+    showSpeakers?: boolean;
     /** Completely disable auto-scroll behavior (for meeting details page) */
     disableAutoScroll?: boolean;
 
@@ -88,6 +90,7 @@ const TranscriptSegment = memo(function TranscriptSegment({
     confidence,
     isStreaming,
     showConfidence,
+    showSpeakers,
     speakers = [],
     onAssignSpeaker,
     isNewSpeaker,
@@ -99,6 +102,7 @@ const TranscriptSegment = memo(function TranscriptSegment({
     confidence?: number;
     isStreaming: boolean;
     showConfidence: boolean;
+    showSpeakers: boolean;
     speakers?: Speaker[];
     onAssignSpeaker?: (segmentId: string, speakerName: string | null) => void;
     isNewSpeaker: boolean;
@@ -107,8 +111,8 @@ const TranscriptSegment = memo(function TranscriptSegment({
     const displayText = cleanStopWords(text) || (text.trim() === '' ? '[Silence]' : text);
 
     return (
-        <div id={`segment-${id}`} className={`group ${isNewSpeaker ? 'mt-6 mb-2' : 'mb-1'}`}>
-            {isNewSpeaker && (
+        <div id={`segment-${id}`} className={`group ${isNewSpeaker && showSpeakers ? 'mt-6 mb-2' : 'mb-1'}`}>
+            {isNewSpeaker && showSpeakers && (
                 <div className="flex items-center gap-3 mb-2 ml-1">
                     <Popover open={open} onOpenChange={setOpen}>
                         <PopoverTrigger asChild>
@@ -190,7 +194,7 @@ const TranscriptSegment = memo(function TranscriptSegment({
                             <p className="text-base text-gray-800 leading-relaxed group-hover:text-black transition-colors">{displayText}</p>
                         )}
                         
-                        {!speaker && !isNewSpeaker && (
+                        {showSpeakers && !speaker && !isNewSpeaker && (
                              <button 
                                 onClick={() => setOpen(true)}
                                 className="absolute -left-10 top-0.5 p-1 rounded-full text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all"
@@ -214,6 +218,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
     isStopping = false,
     enableStreaming = false,
     showConfidence = true,
+    showSpeakers = true,
     disableAutoScroll = false,
     hasMore = false,
     isLoadingMore = false,
@@ -399,6 +404,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         confidence={segment.confidence}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
+                                        showSpeakers={showSpeakers}
                                         speakers={speakers}
                                         onAssignSpeaker={onAssignSpeaker}
                                         isNewSpeaker={isNewSpeaker}
@@ -463,6 +469,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         confidence={segment.confidence}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
+                                        showSpeakers={showSpeakers}
                                         speakers={speakers}
                                         onAssignSpeaker={onAssignSpeaker}
                                         isNewSpeaker={isNewSpeaker}

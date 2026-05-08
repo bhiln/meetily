@@ -36,7 +36,7 @@ export function TranscriptPanel({
 }: TranscriptPanelProps) {
   // Contexts
   const { transcripts, transcriptContainerRef, copyTranscript, updateTranscriptSpeaker } = useTranscripts();
-  const { transcriptModelConfig } = useConfig();
+  const { transcriptModelConfig, betaFeatures } = useConfig();
   const { isRecording, isPaused } = useRecordingState();
   const { checkPermissions, isChecking, hasSystemAudio, hasMicrophone } = usePermissionCheck();
   const isLinux = useIsLinux();
@@ -183,6 +183,7 @@ export function TranscriptPanel({
               isStopping={isStopping}
               enableStreaming={isRecording}
               showConfidence={true}
+              showSpeakers={betaFeatures.speechIdentification}
               speakers={speakers}
               onAssignSpeaker={handleAssignSpeaker}
             />

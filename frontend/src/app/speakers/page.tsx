@@ -9,9 +9,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useConfig } from '@/contexts/ConfigContext';
+import { useRouter } from 'next/navigation';
 
 export default function SpeakersPage() {
+  const { betaFeatures } = useConfig();
+  const router = useRouter();
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
+
+  // Redirect if feature is disabled
+  useEffect(() => {
+    if (!betaFeatures.speechIdentification) {
+      router.push('/');
+    }
+  }, [betaFeatures.speechIdentification, router]);
+
+  if (!betaFeatures.speechIdentification) {
+    return null;
+  }
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);

@@ -22,10 +22,17 @@ export interface BetaFeatures {
    * @since v0.3.0
    */
   importAndRetranscribe: boolean;
+
+  /**
+   * Identifies different speakers in the meeting transcripts
+   * @since v0.4.0
+   */
+  speechIdentification: boolean;
 }
 
 export const DEFAULT_BETA_FEATURES: BetaFeatures = {
   importAndRetranscribe: true, // Default: enabled
+  speechIdentification: false, // Default: disabled
 };
 
 
@@ -34,6 +41,7 @@ export const DEFAULT_BETA_FEATURES: BetaFeatures = {
  */
 export const BETA_FEATURE_NAMES: Record<keyof BetaFeatures, string> = {
   importAndRetranscribe: 'Import Audio & Retranscribe',
+  speechIdentification: 'Speech Identification',
 };
 
 /**
@@ -41,6 +49,7 @@ export const BETA_FEATURE_NAMES: Record<keyof BetaFeatures, string> = {
  */
 export const BETA_FEATURE_DESCRIPTIONS: Record<keyof BetaFeatures, string> = {
   importAndRetranscribe: 'Import audio files to transcribe or retranscribe existing meetings with different language settings.',
+  speechIdentification: 'Automatically identify different speakers in your meeting transcripts.',
 };
 
 /**

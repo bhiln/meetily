@@ -63,6 +63,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use tokio::sync::RwLock;
 
 static RECORDING_FLAG: AtomicBool = AtomicBool::new(false);
+static SPEECH_IDENTIFICATION_ENABLED: AtomicBool = AtomicBool::new(false);
 
 // Global language preference storage (default to "auto-translate" for automatic translation to English)
 static LANGUAGE_PREFERENCE: std::sync::LazyLock<StdMutex<String>> =
@@ -78,6 +79,16 @@ struct TranscriptionStatus {
     chunks_in_queue: usize,
     is_processing: bool,
     last_activity_ms: u64,
+}
+
+#[tauri::command]
+fn set_speech_identification_enabled(enabled: bool) {
+    log_info!("Setting speech identification enabled to: {}", enabled);
+    SPEECH_IDENTIFICATION_ENABLED.store(enabled, Ordering::SeqCst);
+}
+
+pub fn is_speech_identification_enabled() -> bool {
+    SPEECH_IDENTIFICATION_ENABLED.load(Ordering::SeqCst)
 }
 
 #[tauri::command]
@@ -644,6 +655,7 @@ pub fn run() {
             audio::diarization::api_init_diarization,
             audio::diarization::api_download_diarization_model,
             audio::diarization::api_associate_voice_with_speaker,
+            set_speech_identification_enabled,
             api::open_meeting_folder,
             api::test_backend_connection,
             api::debug_backend_connection,

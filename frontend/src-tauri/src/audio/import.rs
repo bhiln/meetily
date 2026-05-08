@@ -605,9 +605,11 @@ async fn run_import<R: Runtime>(
             
             // NEW: Try to identify speaker
             let mut speaker = None;
-            if let Some(service) = crate::audio::diarization::get_diarization_service() {
-                if let Ok(embedding) = service.compute_embedding(&segment.samples) {
-                    speaker = service.identify_speaker(&embedding);
+            if crate::is_speech_identification_enabled() {
+                if let Some(service) = crate::audio::diarization::get_diarization_service() {
+                    if let Ok(embedding) = service.compute_embedding(&segment.samples) {
+                        speaker = service.identify_speaker(&embedding);
+                    }
                 }
             }
             

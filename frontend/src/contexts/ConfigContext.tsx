@@ -165,7 +165,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   // Beta features state (localStorage)
   const [betaFeatures, setBetaFeatures] = useState<BetaFeatures>(() => {
-    return loadBetaFeatures();
+    const features = loadBetaFeatures();
+    // Sync speech identification with backend on startup (only on client)
+    if (typeof window !== 'undefined') {
+      invoke('set_speech_identification_enabled', { enabled: features.speechIdentification }).catch(err =>
+        console.error('Failed to sync speech identification to Rust on startup:', err)
+      );
+    }
+    return features;
   });
 
   // Preference settings state (lazy loaded)
@@ -394,6 +401,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setBetaFeatures(prev => {
       const updated = { ...prev, [featureKey]: enabled };
       saveBetaFeatures(updated);
+
+      // Sync speech identification with backend when toggled
+      if (featureKey === 'speechIdentification') {
+        invoke('set_speech_identification_enabled', { enabled }).catch(err =>
+          console.error('Failed to sync speech identification to Rust:', err)
+        );
+      }
 
       // Track analytics with specific feature
       Analytics.track('beta_feature_toggled', {

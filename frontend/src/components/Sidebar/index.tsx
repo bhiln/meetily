@@ -471,20 +471,22 @@ const Sidebar: React.FC = () => {
             </TooltipContent>
           </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => router.push('/speakers')}
-                className={`p-2 rounded-lg transition-colors duration-150 ${pathname === '/speakers' ? 'bg-gray-100' : 'hover:bg-gray-100'
-                  }`}
-              >
-                <Users className="w-5 h-5 text-gray-600" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>Speakers</p>
-            </TooltipContent>
-          </Tooltip>
+          {betaFeatures.speechIdentification && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => router.push('/speakers')}
+                  className={`p-2 rounded-lg transition-colors duration-150 ${pathname === '/speakers' ? 'bg-gray-100' : 'hover:bg-gray-100'
+                    }`}
+                >
+                  <Users className="w-5 h-5 text-gray-600" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Speakers</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -746,13 +748,15 @@ const Sidebar: React.FC = () => {
                   <Home className="w-4 h-4 mr-2" />
                   <span>Home</span>
                 </div>
-                <div
-                  onClick={() => router.push('/speakers')}
-                  className={`p-3 text-lg font-semibold items-center hover:bg-gray-100 h-10 flex mx-3 mt-1 rounded-lg cursor-pointer ${pathname === '/speakers' ? 'bg-gray-100' : ''}`}
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  <span>Speakers</span>
-                </div>
+                {betaFeatures.speechIdentification && (
+                  <div
+                    onClick={() => router.push('/speakers')}
+                    className={`p-3 text-lg font-semibold items-center hover:bg-gray-100 h-10 flex mx-3 mt-1 rounded-lg cursor-pointer ${pathname === '/speakers' ? 'bg-gray-100' : ''}`}
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    <span>Speakers</span>
+                  </div>
+                )}
               </>
             )}
           </div>
